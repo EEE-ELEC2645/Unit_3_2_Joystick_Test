@@ -1,10 +1,6 @@
 # ELEC2645 - Joystick Input with LCD Display
 
-This project demonstrates embedded systems programming on the STM32L476 Nucleo board, focusing on:
-- **Analog Input Processing** - Reading joystick input from ADC channels
-- **Coordinate Transformations** - Converting between Cartesian and polar coordinates
-- **Circle Mapping** - Optional square-to-circle mapping for uniform control feel
-- **LCD Screen Control** - Visualizing joystick data on an ST7789V2 SPI display
+This project demonstrates reading a 2-axis analogue joystiuck using the ADC on an STM32L4 microcontroller, processing the input into pixel coordinates and displaying the results on an ST7789V2 LCD display.
 
 The most important file is [Core/Src/main.c](Core/Src/main.c) which contains the main application logic.
 
@@ -14,7 +10,7 @@ The program reads a 2-axis analog joystick, processes the input into useful coor
 1. **Raw ADC values** - The 12-bit ADC readings from the joystick X and Y axes
 2. **Angle and Magnitude** - Compass heading (0-360°) and magnitude (0.0-1.0)
 3. **Direction** - Discrete 8-direction output (N, NE, E, SE, S, SW, W, NW, or CENTRE)
-4. **Visual Representation** - A dot that moves within a circular frame
+4. **Visual Representation** - A dot that moves within a square frame
 
 ## Setup Instructions
 
@@ -42,7 +38,7 @@ The program reads a 2-axis analog joystick, processes the input into useful coor
 - **Board not detected**: Check ST-Link drivers and USB cable
 - **Build errors**: Verify joystick and LCD include paths are present in CMake
 - **Joystick not responding**: Confirm ADC channels are configured for X (ADC_CHANNEL_1) and Y (ADC_CHANNEL_2)
-- **Joystick not centred correctly**: Power the joystick from 3.3V, not 5V
+- **Joystick not centred correctly**: Power the joystick from **3.3V**, not 5V
 - **LCD display issues**: Confirm SPI2 and GPIO pin assignments match the wiring table
 
 ## Hardware Configuration
@@ -82,8 +78,8 @@ The program reads a 2-axis analog joystick, processes the input into useful coor
 | File | Purpose |
 |------|---------|
 | [Core/Src/main.c](Core/Src/main.c) | **Main application** - Joystick initialization, calibration, display loop |
-| [joystick/joystick.h](joystick/joystick.h) | Joystick driver header - API documentation and type definitions |
-| [joystick/joystick.c](joystick/joystick.c) | Joystick driver implementation - ADC reading, circle mapping, coordinate transformations |
+| [Joystick/Joystick.h](Joystick/Joystick.h) | Joystick driver header - API documentation and type definitions |
+| [Joystick/Joystick.c](Joystick/Joystick.c) | Joystick driver implementation - ADC reading, circle mapping, coordinate transformations |
 | [Core/Src/adc.c](Core/Src/adc.c) | ADC peripheral initialization |
 | [Core/Src/gpio.c](Core/Src/gpio.c) | GPIO peripheral initialization |
 
@@ -107,7 +103,7 @@ The joystick driver provides a complete abstraction for reading analog joystick 
 - `Joystick_Calibrate()` - Find center position (call while joystick is centered)
 - `Joystick_Read()` - Read current joystick state (call in main loop)
 
-See [joystick/joystick.h](joystick/joystick.h) for complete API documentation.
+See [Joystick/Joystick.h](Joystick/Joystick.h) for complete API documentation.
 
 ### LCD Driver
 
@@ -150,29 +146,14 @@ while (1) {
 }
 ```
 
-### Available Data
+## Test Your Understanding
 
-When you need to check how far the joystick is deflected:
-- `joystick_data.magnitude` - Value 0.0-1.0 indicating how far from center
-  - 0.0 = joystick at center
-  - 1.0 = joystick fully deflected
-
-## Tips for Success
-
-1. **Test Your Understanding**: Print `joystick_data.magnitude` to the serial monitor to see the values while moving the joystick
-2. **Start Simple**: Validate ADC readings before adding display logic
-3. **Debug**: Use breakpoints or `printf()` for quick checks
-4. **Performance**: Limit full-screen LCD redraws when possible to keep refresh smooth
+1. **Data Processing**: Use breakpoints or `printf()` to see how the ADC values are converted first to x/y coordinates, then to the pixel values for dot location
+2. **LCD Performance**: Here we limit full-screen LCD redraws when possible to keep refresh smooth. Try redrawing the frame or background each time and see how the frame rate drops
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| "Direction shows CENTRE when joystick is pushed" | Magnitude check missing or threshold too high | Verify magnitude threshold and direction logic |
-| "Dot position is jerky or inverted" | Y-axis polarity issue | Check coordinate sign or display Y-axis direction |
-| "Colours don't look right" | Wrong color value | Verify palette and LCD color constants |
-| "Compilation errors about joystick.h" | Include path issue | Ensure joystick folder is in include path |
-| "Display doesn't update" | LCD not initialised or refresh missing | Confirm LCD init and `LCD_Refresh()` in loop |
+You should see centre values of about 2048, if not you probably connected the Power pin on the joystick to 5V not 3.3V :)
 
 ## Notes
 
