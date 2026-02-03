@@ -84,10 +84,10 @@ int main(void)
 
   // Configure joystick
   Joystick_cfg_t joystick_cfg = {
-    .adc = &hadc1,
-    .x_channel = ADC_CHANNEL_1,
-    .y_channel = ADC_CHANNEL_2,
-    .sampling_time = ADC_SAMPLETIME_47CYCLES_5,
+    .adc = &hadc1, // ADC handle from MX_ADC1_Init()
+    .x_channel = ADC_CHANNEL_1, // Internally the ADC_CHannel_1 is connected to pin A1 on the arduino header on the Nucleo board
+    .y_channel = ADC_CHANNEL_2, // Internally the ADC_CHannel_2 is connected to pin A2 on the arduino header on the Nucleo board
+    .sampling_time = ADC_SAMPLETIME_47CYCLES_5, // sampling time for ADC in cycles of the ADC clock () this is the miniumn required for the joystick value to stabilise
     .center_x = JOYSTICK_DEFAULT_CENTER_X,
     .center_y = JOYSTICK_DEFAULT_CENTER_Y,
     .deadzone = JOYSTICK_DEADZONE,
@@ -143,10 +143,14 @@ int main(void)
     // Read and process joystick - calculates raw coords, circle-mapped coords, polar, direction, magnitude
     Joystick_Read(&joystick_cfg, &joystick_data);
 
-    // Use normalized Cartesian coordinates (already computed in coord struct)
+    // Use normalized Cartesian coordinates (-1 to 1) (already computed in coord struct)
     float norm_x = joystick_data.coord.x;
     float norm_y = joystick_data.coord.y;
 
+    // Map normalized coordinates to frame pixel positions, centred in frame
+    // We invert y-axis for display as screen y increases downwards
+    // we cast to float to avoid integer multiplication issues
+    // then cast back to int for pixel positions
     int px = frame_cx + (int)(norm_x * (float)frame_half_w);
     int py = frame_cy - (int)(norm_y * (float)frame_half_h);
 

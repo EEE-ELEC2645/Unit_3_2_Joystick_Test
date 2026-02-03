@@ -29,6 +29,34 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 ```
 
+## ADC Channel Configuration
+
+The joystick library uses ADC channel numbers (e.g., `ADC_CHANNEL_1`), not pin names (e.g., `A1_Pin`).
+
+### STM32L476RG ADC1 Pin to Channel Mapping
+
+| Pin Name | Physical Pin | ADC Channel Constant |
+|----------|-------------|---------------------|
+| A5       | PC0         | `ADC_CHANNEL_1`     |
+| A4       | PC1         | `ADC_CHANNEL_2`     |
+| A0       | PA0         | `ADC_CHANNEL_5`     |
+| A1       | PA1         | `ADC_CHANNEL_6`     |
+| A2       | PA4         | `ADC_CHANNEL_9`     |
+| A3       | PB0         | `ADC_CHANNEL_15`    |
+
+**Important:** Pin names (A0-A5) are Arduino-style labels and do not correspond to ADC channel numbers. Always use the ADC channel constant from the table above when configuring the joystick.
+
+### Available ADC Channel Constants
+
+```c
+ADC_CHANNEL_1    // PC0 (A5)
+ADC_CHANNEL_2    // PC1 (A4)
+ADC_CHANNEL_5    // PA0 (A0)
+ADC_CHANNEL_6    // PA1 (A1)
+ADC_CHANNEL_9    // PA4 (A2)
+ADC_CHANNEL_15   // PB0 (A3)
+```
+
 ## Usage
 
 Configure and initialise the joystick:
@@ -36,8 +64,8 @@ Configure and initialise the joystick:
 ```c
 Joystick_cfg_t joy_cfg = {
     .adc = &hadc1,
-    .x_channel = ADC_CHANNEL_1,
-    .y_channel = ADC_CHANNEL_2,
+    .x_channel = ADC_CHANNEL_1,  // PC0 (A5_Pin)
+    .y_channel = ADC_CHANNEL_2,  // PC1 (A4_Pin)
     .sampling_time = ADC_SAMPLETIME_2CYCLES_5,
     .center_x = JOYSTICK_DEFAULT_CENTER_X,
     .center_y = JOYSTICK_DEFAULT_CENTER_Y,
