@@ -1,0 +1,304 @@
+
+
+
+
+
+
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "adc.h"
+//#include "rng.h"
+//#include "stm32l4xx_hal.h"
+//#include "stm32l4xx_hal_adc.h"
+//#include "tim.h"
+#include "usart.h"
+#include "gpio.h"
+#include "adc.h"
+
+#include <math.h> // for sqrtf, atan2f, etc.
+#include <stdint.h> // for uint8_t etc. (already included in LCD.h but good practice to include if using uint8_t etc.)
+#include <stdio.h> // for printf
+
+
+void SystemClock_Config(void);
+void PeriphCommonClock_Config(void);
+
+#include "Joystick.h" // include the Joystick driver functions
+#include "LCD.h" // include the LCD driver functions
+
+
+int _write(int file, char *ptr, int len) {
+  // added -u _printf_float in CMakeLists.txt to enable floating point support in printf
+    HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+    return len;
+}
+
+
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_ADC1_Init();
+  //MX_RNG_Init();
+  //MX_TIM2_Init();
+  //MX_TIM4_Init();
+  MX_USART2_UART_Init();
+
+
+
+  // Configure the LCD just like Unit 3.1 labs
+  ST7789V2_cfg_t cfg0 = {
+    .setup_done = 0,
+    .spi = SPI2,
+    .RST = {.port = GPIOB, .pin = GPIO_PIN_2},
+    .BL = {.port = GPIOB, .pin = GPIO_PIN_1},
+    .DC = {.port = GPIOB, .pin = GPIO_PIN_11},
+    .CS = {.port = GPIOB, .pin = GPIO_PIN_12},
+    .MOSI = {.port = GPIOB, .pin = GPIO_PIN_15},
+    .SCLK = {.port = GPIOB, .pin = GPIO_PIN_13},
+    .dma = {.instance = DMA1, .channel = DMA1_Channel5}
+  };
+
+  // Initialize LCD - note that this also powers on the display and backlight
+  // and also if the display was previously powered on, it will probably show the last image
+  // that was displayed before reset
+  LCD_init(&cfg0);
+
+
+  // make screen black (0 in palette set in LCD.h)
+  LCD_Fill_Buffer(0);
+  LCD_Refresh(&cfg0);
+
+
+  printf("Joystick Lab lets go!...\n");
+
+  // Configure joystick
+  Joystick_cfg_t joystick_cfg = {
+    .adc = &hadc1,
+    .x_channel = ADC_CHANNEL_1,
+    .y_channel = ADC_CHANNEL_2,
+    .sampling_time = ADC_SAMPLETIME_47CYCLES_5,
+    .center_x = JOYSTICK_DEFAULT_CENTER_X,
+    .center_y = JOYSTICK_DEFAULT_CENTER_Y,
+    .deadzone = JOYSTICK_DEADZONE,
+    .setup_done = 0
+  };
+  
+  // Data structure to hold joystick readings
+  Joystick_t joystick_data;
+  
+  // Initialize joystick ADC
+  Joystick_Init(&joystick_cfg);
+  
+  // Optional: Calibrate joystick (comment out if joystick should be in center position at startup)
+  printf("Calibrating joystick - keep it centered...\n");
+  Joystick_Calibrate(&joystick_cfg);
+  printf("Calibration complete: X=%d, Y=%d\n", joystick_cfg.center_x, joystick_cfg.center_y);
+
+  LCD_printString("Joystick",  0, 10, 1, 5);
+  LCD_Refresh(&cfg0);
+  HAL_Delay(200); // delay by 200 ms to allow time to see the text 
+  LCD_printString("Testing",  0, 70, 1, 5);
+  LCD_Refresh(&cfg0);
+  HAL_Delay(200);
+  LCD_printString("Start",  0, 140, 1, 5);
+  LCD_Refresh(&cfg0);
+
+  HAL_Delay(1000);
+
+  
+
+  // Demo frame settings (small area for polar dot control)
+  const int frame_x = 20;
+  const int frame_y = 40;
+  const int frame_w = 200;
+  const int frame_h = 200;
+  const int frame_cx = frame_x + (frame_w / 2);
+  const int frame_cy = frame_y + (frame_h / 2);
+  const int frame_half_w = (frame_w / 2) - 4;
+  const int frame_half_h = (frame_h / 2) - 4;
+
+  LCD_Fill_Buffer(0);
+  // Draw frame outline - one do this once to avoid redrawing lots of rows
+  LCD_Draw_Rect(frame_x, frame_y, frame_w, frame_h, 1, 0);
+  LCD_Refresh(&cfg0);
+
+  // Track previous dot position for efficient clearing
+  int px_prev = frame_cx;
+  int py_prev = frame_cy;
+
+  
+  while (1)
+  {
+    // Read and process joystick - calculates raw coords, circle-mapped coords, polar, direction, magnitude
+    Joystick_Read(&joystick_cfg, &joystick_data);
+
+    // Use normalized Cartesian coordinates (already computed in coord struct)
+    float norm_x = joystick_data.coord.x;
+    float norm_y = joystick_data.coord.y;
+
+    int px = frame_cx + (int)(norm_x * (float)frame_half_w);
+    int py = frame_cy - (int)(norm_y * (float)frame_half_h);
+
+    // Clear previous dot position
+    LCD_Draw_Rect(px_prev - 2, py_prev - 2, 4, 4, 0, 1);
+
+    // Clear top text area
+    LCD_Draw_Rect(0, 0, 240, 35, 0, 1);
+
+    // Display ADC and XY values at the top
+    char adc_str[32];
+    char xy_str[32];
+    sprintf(adc_str, "ADC X:%4d Y:%4d", joystick_data.x_raw, joystick_data.y_raw);
+    sprintf(xy_str, "XY  X:%0.2f Y:%0.2f", norm_x, norm_y);
+    LCD_printString(adc_str, 0, 0, 1, 2);
+    LCD_printString(xy_str, 0, 18, 1, 2);
+
+    // Draw dot at new position
+    LCD_Draw_Rect(px - 2, py - 2, 4, 4, 1, 1);
+
+    // Update previous position
+    px_prev = px;
+    py_prev = py;
+
+    LCD_Refresh(&cfg0);
+
+    //HAL_Delay(50);  // Update rate: ~20 Hz
+
+
+  }
+
+}
+
+
+
+// ==== AUTO-GENERATED STM32 FUNCTIONS ====
+// This is auto generated by STM32CubeMX, luckily we can just leave it here we dont need to understand it
+//
+// DO NOT EDIT UNLESS YOU KNOW WHAT YOU ARE DOING! 
+
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLN = 10;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RNG|RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCCLKSOURCE_PLLSAI1;
+  PeriphClkInit.RngClockSelection = RCC_RNGCLKSOURCE_PLLSAI1;
+  PeriphClkInit.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_HSI;
+  PeriphClkInit.PLLSAI1.PLLSAI1M = 1;
+  PeriphClkInit.PLLSAI1.PLLSAI1N = 8;
+  PeriphClkInit.PLLSAI1.PLLSAI1P = RCC_PLLP_DIV7;
+  PeriphClkInit.PLLSAI1.PLLSAI1Q = RCC_PLLQ_DIV4;
+  PeriphClkInit.PLLSAI1.PLLSAI1R = RCC_PLLR_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK|RCC_PLLSAI1_ADC1CLK;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+#ifdef USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
