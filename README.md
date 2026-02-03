@@ -21,7 +21,7 @@ The program reads a 2-axis analog joystick, processes the input into useful coor
 	- Familiarity with ADC and GPIO basics
 
 2. **Configure the Project**
-	- Open the JoystickNewProject2 folder in VS Code
+	- Open the Unit_3_2_Joystick_Test folder in VS Code
 	- When prompted to configure the CMake project, choose **Yes**
 	- Select **Debug** configuration when prompted
 
