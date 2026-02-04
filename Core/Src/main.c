@@ -1,4 +1,4 @@
-// ELEC2645 Unit 3 Magic 8-Ball
+// ELEC2645 Unit 3 Joystick Test
 
 // These are the header files that include the necessary declarations for the functions and peripherals used
 // e.g. HAL (Hardware Abstraction Layer) functions, USART (serial communication), GPIO (general-purpose input/output)
