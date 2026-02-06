@@ -1,4 +1,4 @@
-#include "joystick.h"
+#include "Joystick.h"
 #include <stdlib.h>
 #include <math.h>
 
